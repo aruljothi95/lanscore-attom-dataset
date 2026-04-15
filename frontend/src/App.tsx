@@ -196,6 +196,17 @@ function App() {
     }
   }, [schema])
 
+  // When switching tables, clear row/column filters to avoid invalid column filters
+  // carrying over to a different table (which can cause API errors).
+  useEffect(() => {
+    setRowQuery('')
+    setColFilterColumn('')
+    setColFilterValue('')
+    setColFilters([])
+    setPage(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTable])
+
   useEffect(() => {
     if (!activeTable) return
     let cancelled = false
@@ -271,7 +282,6 @@ function App() {
                 }
                 onClick={() => {
                   setActiveTable(t)
-                  setPage(1)
                 }}
               >
                 <span className="badge">tbl</span>
