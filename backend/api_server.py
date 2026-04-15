@@ -71,7 +71,7 @@ def list_tables(schema: str) -> list[str]:
         return [r[0] for r in conn.execute(sql, {"schema": schema}).fetchall()]
 
 
-HIDDEN_COLS = {"id", "transactionid", "transaction_id", "attom_id", "attomid"}
+HIDDEN_COLS = {"id", "transactionid", "transaction_id", "attom_id", "attomid", "ingested_at"}
 
 
 _ident_re = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")

@@ -2,7 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { fetchRows, fetchTables, type PageResponse } from './lib/api'
 
-const HIDDEN_COLS = new Set(['id', 'transactionid', 'transaction_id', 'attom_id', 'attomid'])
+const HIDDEN_COLS = new Set([
+  'id',
+  'transactionid',
+  'transaction_id',
+  'attom_id',
+  'attomid',
+  'ingested_at',
+])
 
 function titleCase(s: string): string {
   return s
@@ -131,7 +138,7 @@ function prettyHeader(col: string): string {
 }
 
 function formatCellValue(v: unknown): string {
-  if (v === null || v === undefined) return ''
+  if (v === null || v === undefined) return '-'
   if (typeof v === 'string') {
     // ISO date-time like 2026-04-08T00:00:00 or 2026-04-08 00:00:00 -> show date only
     if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}/.test(v)) return v.slice(0, 10)
@@ -175,8 +182,10 @@ function App() {
       try {
         const resp = await fetchTables(schema)
         if (cancelled) return
-        setTables(resp.tables)
-        setActiveTable((prev) => prev ?? resp.tables[0] ?? null)
+        const hiddenTables = new Set(['recorder_deletes', 'property_deletes'])
+        const visible = resp.tables.filter((t) => !hiddenTables.has(t))
+        setTables(visible)
+        setActiveTable((prev) => (prev && visible.includes(prev) ? prev : visible[0] ?? null))
       } catch (e: any) {
         if (cancelled) return
         setError(e?.message ?? 'Failed to load tables')
