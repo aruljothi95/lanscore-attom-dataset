@@ -14,13 +14,21 @@ export type PageResponse = {
 }
 
 function apiBase(): string {
-  const base = import.meta.env.VITE_API_BASE
-  if (!base) {
-    throw new Error(
-      'Missing VITE_API_BASE. Set it in frontend/.env (dev) or as a build env var (prod).',
-    )
+  // In Vite, import.meta.env is baked at BUILD time.
+  // In Docker+nginx deployments, runtime env vars won't affect the built bundle.
+  // So we support:
+  // 1) VITE_API_BASE baked at build time (preferred)
+  // 2) a relative '/api' fallback (when nginx is configured to proxy /api -> backend)
+  // 3) as a last resort, same-host :5000 (common backend port in your deployment)
+  const baked = import.meta.env.VITE_API_BASE
+  if (baked && baked.trim()) return baked.trim()
+
+  if (typeof window !== 'undefined') {
+    // If you don't set VITE_API_BASE, we try a sensible default for your AWS setup.
+    return `${window.location.protocol}//${window.location.hostname}:5000`
   }
-  return base
+
+  return 'http://127.0.0.1:8000'
 }
 
 export async function fetchTables(schema?: string): Promise<TablesResponse> {

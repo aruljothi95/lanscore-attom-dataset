@@ -5,6 +5,9 @@ COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 
 COPY . .
+# Vite only reads VITE_* vars at build-time.
+ARG VITE_API_BASE
+ENV VITE_API_BASE=$VITE_API_BASE
 RUN npm run build
 
 
