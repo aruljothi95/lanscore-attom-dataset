@@ -1,0 +1,20 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:80"
+    environment:
+      # Used at build-time only if you bake it in;
+      # runtime calls go directly to backend by hostname below if same compose network.
+      - VITE_API_BASE=http://backend:8000
+    depends_on:
+      - backend
