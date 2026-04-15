@@ -140,6 +140,42 @@ body {
   background: #fff;
 }
 
+.chipRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow: auto;
+  max-width: 100%;
+  padding-bottom: 2px; /* keep scrollbar off buttons */
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.chipRemove {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #475569;
+  font-weight: 650;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.chipRemove:hover {
+  color: #0f172a;
+}
+
 .panelTitle {
   font-weight: 650;
 }

@@ -141,12 +141,25 @@ function formatCellValue(v: unknown): string {
   return String(v)
 }
 
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delayMs)
+    return () => window.clearTimeout(t)
+  }, [value, delayMs])
+  return debounced
+}
+
 function App() {
   const [schema] = useState('attom_dataset')
   const [tables, setTables] = useState<string[]>([])
   const [activeTable, setActiveTable] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [rowQuery, setRowQuery] = useState('')
+  const debouncedRowQuery = useDebouncedValue(rowQuery, 350)
+  const [colFilterColumn, setColFilterColumn] = useState('')
+  const [colFilterValue, setColFilterValue] = useState('')
+  const [colFilters, setColFilters] = useState<Array<{ column: string; value: string }>>([])
 
   const [pageSize, setPageSize] = useState(50)
   const [page, setPage] = useState(1)
@@ -186,6 +199,8 @@ function App() {
           table: activeTable,
           page,
           pageSize,
+          q: debouncedRowQuery,
+          filters: colFilters,
         })
         if (cancelled) return
         setData(resp)
@@ -200,7 +215,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [schema, activeTable, page, pageSize])
+  }, [schema, activeTable, page, pageSize, debouncedRowQuery, colFilters])
 
   const filteredTables = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -214,16 +229,7 @@ function App() {
     return data.columns.filter((c) => !HIDDEN_COLS.has(String(c).toLowerCase()))
   }, [data])
 
-  const filteredRows = useMemo(() => {
-    if (!data) return []
-    const needle = rowQuery.trim().toLowerCase()
-    if (!needle) return data.rows
-    return data.rows.filter((r) =>
-      visibleColumns.some((c) => String((r as any)[c] ?? '').toLowerCase().includes(needle)),
-    )
-  }, [data, rowQuery, visibleColumns])
-
-  const pageShownCount = data ? filteredRows.length : 0
+  const pageShownCount = data ? data.rows.length : 0
 
   return (
     <div className="app">
@@ -289,6 +295,39 @@ function App() {
                     setPage(1)
                   }}
                 />
+
+                <select
+                  className="select"
+                  value={colFilterColumn}
+                  onChange={(e) => setColFilterColumn(e.target.value)}
+                >
+                  <option value="">Filter column…</option>
+                  {visibleColumns.map((c) => (
+                    <option key={c} value={c}>
+                      {prettyHeader(c)}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="search"
+                  style={{ width: 220 }}
+                  placeholder="Value…"
+                  value={colFilterValue}
+                  onChange={(e) => setColFilterValue(e.target.value)}
+                />
+                <button
+                  className="btn"
+                  disabled={!colFilterColumn || !colFilterValue.trim()}
+                  onClick={() => {
+                    const column = colFilterColumn.trim().toLowerCase()
+                    const value = colFilterValue.trim()
+                    setColFilters((prev) => [...prev, { column, value }])
+                    setColFilterValue('')
+                    setPage(1)
+                  }}
+                >
+                  Add
+                </button>
               </div>
             </div>
 
@@ -305,14 +344,14 @@ function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRows.map((r, idx) => (
+                    {data.rows.map((r, idx) => (
                       <tr key={idx}>
                         {visibleColumns.map((c) => (
                           <td key={c}>{formatCellValue((r as any)[c])}</td>
                         ))}
                       </tr>
                     ))}
-                    {!filteredRows.length && (
+                    {!data.rows.length && (
                       <tr>
                         <td colSpan={visibleColumns.length || 1} className="empty">
                           No rows.
@@ -329,10 +368,47 @@ function App() {
                 <div className="subtle">
                   Showing {pageShownCount.toLocaleString()} of {data.total_rows.toLocaleString()}{' '}
                   records • Page {data.page} of {totalPages}
-                  {rowQuery.trim() ? ` • Filtered on page` : ''}
+                  {rowQuery.trim() || colFilters.length ? ` • Filtered` : ''}
                 </div>
 
                 <div className="controls">
+                  {colFilters.length > 0 && (
+                    <>
+                      <div className="chipRow" aria-label="Active filters">
+                        {colFilters.map((f, i) => (
+                          <span className="chip" key={`${f.column}::${f.value}::${i}`}>
+                            <span>
+                              {prettyHeader(f.column)}: {f.value}
+                            </span>
+                            <button
+                              className="chipRemove"
+                              onClick={() => {
+                                setColFilters((prev) => prev.filter((_, idx) => idx !== i))
+                                setPage(1)
+                              }}
+                              title="Remove filter"
+                              aria-label="Remove filter"
+                              type="button"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setColFilters([])
+                          setPage(1)
+                        }}
+                        type="button"
+                      >
+                        Clear filters
+                      </button>
+                    </>
+                  )}
+
                   <label className="subtle">
                     Page size{' '}
                     <select

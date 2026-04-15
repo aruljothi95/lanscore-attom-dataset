@@ -109,6 +109,10 @@ def get_table_rows(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=50, ge=1, le=500),
     q: str | None = Query(default=None, description="Search across any column (case-insensitive)"),
+    f: list[str] | None = Query(
+        default=None,
+        description="Column-wise filters. Repeat param: f=column=value (case-insensitive contains).",
+    ),
 ) -> PageResponse:
     tables = set(list_tables(schema))
     if table not in tables:
@@ -132,16 +136,54 @@ def get_table_rows(
             rows=[],
         )
 
-    where_sql = ""
     params: dict[str, Any] = {"limit": page_size, "offset": offset}
+    clauses: list[str] = []
+
     if q and q.strip():
-        needle = f"%{q.strip()}%"
-        params["q"] = needle
-        ors = " OR ".join([f"cast({quote_ident(c)} as text) ILIKE :q" for c in visible_cols])
-        where_sql = f" where ({ors})"
+        params["q"] = f"%{q.strip()}%"
+        concat = "concat_ws(' ', " + ", ".join([f"cast({quote_ident(c)} as text)" for c in visible_cols]) + ")"
+        clauses.append(f"({concat} ILIKE :q)")
+
+    if f:
+        # Group filters by column: OR within a column, AND across columns.
+        visible_lower = {c.lower(): c for c in visible_cols}
+        grouped: dict[str, list[str]] = {}
+        for raw in f:
+            if "=" not in raw:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid filter format: {raw} (expected column=value)",
+                )
+            col_in, val = raw.split("=", 1)
+            col_in = col_in.strip()
+            val = val.strip()
+            if not col_in:
+                raise HTTPException(status_code=400, detail=f"Invalid filter column: {raw}")
+            if col_in.lower() not in visible_lower:
+                raise HTTPException(status_code=400, detail=f"Unknown/hidden filter column: {col_in}")
+            col = visible_lower[col_in.lower()]
+            grouped.setdefault(col, []).append(val)
+
+        idx = 0
+        for col, values in grouped.items():
+            ors: list[str] = []
+            for v in values:
+                key = f"f{idx}"
+                idx += 1
+                params[key] = f"%{v}%"
+                ors.append(f"(cast({quote_ident(col)} as text) ILIKE :{key})")
+            if ors:
+                clauses.append("(" + " OR ".join(ors) + ")")
+
+    where_sql = f" where ({' AND '.join(clauses)})" if clauses else ""
 
     with engine.connect() as conn:
-        total = int(conn.execute(text(f"select count(*) from {quote_ident(schema)}.{quote_ident(table)}{where_sql}"), params).scalar())
+        total = int(
+            conn.execute(
+                text(f"select count(*) from {quote_ident(schema)}.{quote_ident(table)}{where_sql}"),
+                params,
+            ).scalar()
+        )
 
         select_cols = ", ".join([quote_ident(c) for c in visible_cols])
         result = conn.execute(

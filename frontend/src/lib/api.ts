@@ -57,6 +57,7 @@ export async function fetchRows(params: {
   page: number
   pageSize: number
   q?: string
+  filters?: Array<{ column: string; value: string }>
 }): Promise<PageResponse> {
   const u = makeUrl(`/tables/${encodeURIComponent(params.table)}/rows`)
   const url = typeof u === 'string' ? new URL(u, window.location.origin) : u
@@ -64,6 +65,13 @@ export async function fetchRows(params: {
   url.searchParams.set('page', String(params.page))
   url.searchParams.set('page_size', String(params.pageSize))
   if (params.q && params.q.trim()) url.searchParams.set('q', params.q.trim())
+  if (params.filters) {
+    for (const f of params.filters) {
+      const col = (f.column ?? '').trim().toLowerCase()
+      if (!col) continue
+      url.searchParams.append('f', `${col}=${f.value ?? ''}`)
+    }
+  }
   const res = await fetch(url.toString())
   if (!res.ok) throw new Error(`Failed to load rows (${res.status})`)
   return (await res.json()) as PageResponse
