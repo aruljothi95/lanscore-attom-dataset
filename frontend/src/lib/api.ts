@@ -13,10 +13,14 @@ export type PageResponse = {
   rows: Record<string, unknown>[]
 }
 
-const DEFAULT_API_BASE = 'http://127.0.0.1:8000'
-
 function apiBase(): string {
-  return (import.meta as any).env?.VITE_API_BASE ?? DEFAULT_API_BASE
+  const base = import.meta.env.VITE_API_BASE
+  if (!base) {
+    throw new Error(
+      'Missing VITE_API_BASE. Set it in frontend/.env (dev) or as a build env var (prod).',
+    )
+  }
+  return base
 }
 
 export async function fetchTables(schema?: string): Promise<TablesResponse> {
