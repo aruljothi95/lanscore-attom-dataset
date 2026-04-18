@@ -74,7 +74,8 @@ TARGETS: list[Target] = [
     Target(name="recorder", strategy="attom+apn", apn_cols=("apnformatted", "apnoriginal")),
     Target(name="loan_originator", strategy="attom+apn", apn_cols=("apnformatted", "apnoriginal")),
     Target(name="foreclosure", strategy="attom+apn", apn_cols=("parcelnumberformatted",)),
-    Target(name="assignment_release", strategy="apn", apn_cols=("parcelnumberraw",)),
+    # assignment_release has 'attomid' and parcelnumberraw (sometimes unreliable); prefer attomid when available
+    Target(name="assignment_release", strategy="attom+apn", apn_cols=("parcelnumberraw",)),
 ]
 
 

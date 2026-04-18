@@ -2,14 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { fetchRows, fetchTables, type PageResponse } from './lib/api'
 
-const HIDDEN_COLS = new Set([
-  'id',
-  'transactionid',
-  'transaction_id',
-  'attom_id',
-  'attomid',
-  'ingested_at',
-])
+const HIDDEN_COLS = new Set(['id', 'ingested_at'])
 
 function titleCase(s: string): string {
   return s
@@ -183,9 +176,12 @@ function App() {
         const resp = await fetchTables(schema)
         if (cancelled) return
         const hiddenTables = new Set(['recorder_deletes', 'property_deletes'])
-        const visible = resp.tables.filter((t) => !hiddenTables.has(t))
-        setTables(visible)
-        setActiveTable((prev) => (prev && visible.includes(prev) ? prev : visible[0] ?? null))
+        const isDeleteBackup = (t: string) => t.toLowerCase().includes('_delete_backup')
+        const visibleAll = resp.tables.filter((t) => !hiddenTables.has(t) && !isDeleteBackup(t))
+        setTables(visibleAll)
+        setActiveTable((prev) =>
+          prev && visibleAll.includes(prev) ? prev : visibleAll[0] ?? null,
+        )
       } catch (e: any) {
         if (cancelled) return
         setError(e?.message ?? 'Failed to load tables')
@@ -237,11 +233,24 @@ function App() {
     }
   }, [schema, activeTable, page, pageSize, debouncedRowQuery, colFilters])
 
-  const filteredTables = useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    if (!needle) return tables
-    return tables.filter((t) => t.toLowerCase().includes(needle))
-  }, [tables, q])
+  /** Names starting with `property_` (e.g. property_to_boundarymatch_parcel). */
+  const { mappedTables, otherTables } = useMemo(() => {
+    const mapped = tables.filter((t) => t.startsWith('property_')).sort()
+    const other = tables.filter((t) => !t.startsWith('property_')).sort()
+    return { mappedTables: mapped, otherTables: other }
+  }, [tables])
+
+  const needle = q.trim().toLowerCase()
+  const matchesSearch = (t: string) => !needle || t.toLowerCase().includes(needle)
+
+  const filteredMappedTables = useMemo(
+    () => mappedTables.filter(matchesSearch),
+    [mappedTables, needle],
+  )
+  const filteredOtherTables = useMemo(
+    () => otherTables.filter(matchesSearch),
+    [otherTables, needle],
+  )
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total_rows / data.page_size)) : 1
   const visibleColumns = useMemo(() => {
@@ -274,21 +283,48 @@ function App() {
             />
           </div>
           <div className="tableList">
-            {filteredTables.map((t) => (
-              <button
-                key={t}
-                className={
-                  'tableItem ' + (t === activeTable ? 'tableItemActive' : '')
-                }
-                onClick={() => {
-                  setActiveTable(t)
-                }}
-              >
-                <span className="badge">tbl</span>
-                <span>{prettyTableName(t)}</span>
-              </button>
-            ))}
-            {!filteredTables.length && (
+            {mappedTables.length > 0 && (
+              <div className="tableListSection">
+                <div className="sidebarSectionTitle">Mapped with Geojson</div>
+                {filteredMappedTables.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={
+                      'tableItem ' + (t === activeTable ? 'tableItemActive' : '')
+                    }
+                    onClick={() => setActiveTable(t)}
+                  >
+                    <span className="badge">map</span>
+                    <span>{prettyTableName(t)}</span>
+                  </button>
+                ))}
+                {needle && !filteredMappedTables.length && (
+                  <div className="empty subtle">No matches in this group.</div>
+                )}
+              </div>
+            )}
+
+            {otherTables.length > 0 && (
+              <div className="tableListSection">
+                <div className="sidebarSectionTitle">Tables</div>
+                {filteredOtherTables.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={
+                      'tableItem ' + (t === activeTable ? 'tableItemActive' : '')
+                    }
+                    onClick={() => setActiveTable(t)}
+                  >
+                    <span className="badge">tbl</span>
+                    <span>{prettyTableName(t)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {!filteredMappedTables.length && !filteredOtherTables.length && (
               <div className="empty">No matching tables.</div>
             )}
           </div>

@@ -72,6 +72,21 @@ body {
   overflow: auto;
 }
 
+.tableListSection + .tableListSection {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eef2f7;
+}
+
+.sidebarSectionTitle {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  padding: 4px 8px 8px;
+  text-transform: none;
+}
+
 .tableItem {
   width: 100%;
   text-align: left;
