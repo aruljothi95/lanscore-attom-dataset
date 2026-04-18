@@ -32,3 +32,4 @@ Thumbs.db
 *.njsproj
 *.sln
 backend/NIKASHA_TAXASSESSOR_0001.txt
+backend/*.geojson
